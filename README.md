@@ -42,14 +42,6 @@ removed and the original solid-body count and volume verified afterwards.
 These checks do not establish dimensional correctness for every future edit:
 measure the geometry you intended to change.
 
-### MCP versus browser automation
-
-Direct API calls can avoid repeated screenshots, selections and dialogs for
-routine edits and measurements. That can reduce token usage, but this fork has
-**no measured token-efficiency benchmark** and makes no numerical savings claim.
-Large feature-tree and topology responses can still be expensive to inspect.
-Use browser automation when a required operation is unavailable through the MCP.
-
 ### Public code and security reporting
 
 This repository and its published branches are public. It is a community fork,
