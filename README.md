@@ -1,12 +1,13 @@
-# Onshape MCP server
+# Onshape MCP server — community fork
 
 Drive [Onshape](https://www.onshape.com) CAD from an AI assistant. 87 tools for
 documents, part studios, sketching, solid features, assemblies, drawings,
-measurement and export — and no setup beyond installing it: the first tool call
-that needs Onshape opens a browser and asks you to connect.
+measurement and export. After installation, the first tool call that needs
+Onshape opens a browser and asks you to connect.
 
-[![CI](https://github.com/gpambrozio/onshape-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/gpambrozio/onshape-mcp/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/@gpambrozio/onshape-mcp)](https://www.npmjs.com/package/@gpambrozio/onshape-mcp)
+[Upstream project](https://github.com/gpambrozio/onshape-mcp) ·
+[This fork](https://github.com/grdenyer/onshape-mcp) ·
+[Upstream contribution: PR #3](https://github.com/gpambrozio/onshape-mcp/pull/3)
 
 ```
 "Make a 60 × 40 × 10 mm bracket with 4 mm mounting holes and 2 mm fillets, then show me a render"
@@ -15,7 +16,90 @@ that needs Onshape opens a browser and asks you to connect.
 The assistant sketches it, extrudes it, fillets the edges, measures the result,
 renders it back into the conversation, and exports an STL you can print.
 
-## Install
+## Why this fork exists
+
+This is a community fork of Gustavo Ambrozio's Onshape MCP server, focused on
+reliable inspection and modification of existing CAD models through Onshape's
+REST API. It can work with native sketches, extrudes and other features, then
+inspect regenerated geometry to verify the result. Credit for the server and
+its broad tool coverage belongs to the upstream project.
+
+The public changes in this fork are offered upstream in
+[PR #3](https://github.com/gpambrozio/onshape-mcp/pull/3):
+
+- Verify regeneration after feature updates, including errors elsewhere in the
+  Part Studio. HTTP success alone does not mean the model regenerated correctly.
+- Report acknowledged creations and updates explicitly, even if subsequent
+  validation fails, so an assistant can inspect the result before retrying.
+- Keep feature IDs and validation outcomes visible when large API responses are
+  saved to disk. A local file-storage failure does not turn a successful model
+  edit into a reported failed write.
+
+The public branch passed 60 offline tests, TypeScript checks and a clean build.
+Live MCP checks used a disposable Part Studio to exercise successful edits,
+regeneration errors and response-storage failures; temporary features were
+removed and the original solid-body count and volume verified afterwards.
+These checks do not establish dimensional correctness for every future edit:
+measure the geometry you intended to change.
+
+### MCP versus browser automation
+
+Direct API calls can avoid repeated screenshots, selections and dialogs for
+routine edits and measurements. That can reduce token usage, but this fork has
+**no measured token-efficiency benchmark** and makes no numerical savings claim.
+Large feature-tree and topology responses can still be expensive to inspect.
+Use browser automation when a required operation is unavailable through the MCP.
+
+### Public code and security reporting
+
+This repository and its published branches are public. It is a community fork,
+not an official Onshape product or a security certification. The documentation
+and installation instructions here describe the public code only.
+
+Never put API keys, tokens, credential files or private model data in issues,
+pull requests or chat messages. For upstream vulnerabilities, follow
+[upstream's security policy](https://github.com/gpambrozio/onshape-mcp/blob/main/SECURITY.md).
+If its private reporting channel is unavailable, ask the maintainer for a
+private channel without publishing vulnerability details or patches.
+
+## Install this fork from source
+
+The upstream npm package and Desktop bundles below do **not** install this fork.
+This fork currently publishes no separate npm package or release bundle.
+
+With Node 20 or newer:
+
+```bash
+git clone --branch main https://github.com/grdenyer/onshape-mcp.git
+cd onshape-mcp
+npm ci --ignore-scripts
+npm run check
+npm run build
+```
+
+Configure your MCP client to launch the built server. Replace the paths with
+absolute paths on your machine:
+
+```json
+{
+  "mcpServers": {
+    "onshape-local": {
+      "command": "/absolute/path/to/node",
+      "args": ["/absolute/path/to/onshape-mcp/dist/index.js"]
+    }
+  }
+}
+```
+
+For reproducible installs, record the revision with `git rev-parse HEAD`.
+Updates are manual: review incoming changes, rebuild, then reconnect the MCP
+client so its running process loads the new build.
+
+## Install upstream instead
+
+The following commands and release links install the original upstream project.
+They are retained for reference; check PR #3's status before assuming an upstream
+release includes this fork's changes.
 
 **Claude Code**
 
@@ -53,18 +137,19 @@ Nothing to configure. The first tool call that needs Onshape starts a sign-in
 and asks your client to show you the link; clients that support MCP's URL
 elicitation render it as a prompt, and the rest get the URL in the reply. The
 page that opens links straight to the key page for your Onshape stack and takes
-the pasted pair; tick **Read**, **Write** and **Delete** when you create the key
-so every tool here works. Keys are verified against Onshape, then stored in your
-OS keychain.
+the pasted pair. Grant **Read** for inspection and **Write** for edits; add
+**Delete** only if you need deletion tools. Keys are verified against Onshape,
+then stored in the OS keychain when available, with a local file fallback
+described under Configuration.
 
-Your credentials never pass through the assistant, the model or this project's
-authors — the exchange happens between your browser and a server bound to
-`127.0.0.1` in this process, which is exactly why MCP has URL elicitation.
+With the browser sign-in flow, you enter keys into a local form bound to
+`127.0.0.1`; you do not need to paste them into the assistant conversation.
 
 Other ways in, if you prefer:
 
 - **`onshape_login`** — start the same flow deliberately.
-- **`onshape_set_api_key`** — paste a key pair you already have.
+- **`onshape_set_api_key`** — accepts a key pair as tool arguments. Prefer the
+  local browser form to keep keys out of assistant messages and tool transcripts.
 - **OAuth 2.0** — `onshape_login` with `method: "oauth"`, for an app you
   registered at the [Onshape developer portal](https://cad.onshape.com/appstore/dev-portal)
   with redirect URL `http://localhost:8471/oauth/callback`. Tokens refresh
@@ -101,7 +186,10 @@ or `{"ok": false, "error": …, "detail": …}`.
 
 Worth knowing:
 
-- **Units are inches and degrees** throughout.
+- **High-level builder inputs use inches and degrees.** Raw REST payloads and
+  geometry retain Onshape's native units (often metres), while FeatureScript
+  results use the units requested by the script. Check units before comparing
+  values or editing raw dimension expressions such as `0.9 mm`.
 - **Feature tools validate by default.** Onshape answers `200` for a feature
   that fails to regenerate, so each tool re-reads the feature state and fails
   loudly instead. Pass `validate: false` to skip it.
